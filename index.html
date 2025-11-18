@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Budget Tracker</title>
+    <title>Budget Tracker (Low Friction)</title>
+    <!-- Load Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Custom styles for Inter font and overall look */
@@ -13,14 +14,13 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f7f9fb;
-            /* FIX: Removed flex properties to allow native scrolling on content overflow */
+            /* FIX: Ensure native scrolling on content overflow */
             min-height: 100vh;
             padding: 20px;
         }
         .budget-card {
             max-width: 500px;
             width: 100%;
-            /* Added margin auto for horizontal centering */
             margin: 0 auto;
             background-color: white;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
@@ -41,14 +41,10 @@
         .spent-button {
             transition: all 0.2s ease-in-out;
         }
-        .spent-button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
-        }
         .history-item:nth-child(even) {
-            background-color: #f3f4f6;
+            background-color: #f3ffef; /* Very light green stripe */
         }
-        /* Custom style for the success message (using the error div as a temporary toast) */
+        /* Notification Toast */
         #notificationMessage {
             position: fixed;
             top: 20px;
@@ -57,19 +53,43 @@
             transition: opacity 0.3s ease-in-out;
             max-width: 300px;
         }
+        
+        /* Specific button styling for active/inactive state */
+        .btn-expense-active {
+            background-color: #ef4444; /* Red 500 */
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3), 0 2px 4px -2px rgba(239, 68, 68, 0.3);
+        }
+        .btn-expense-inactive {
+            background-color: #fee2e2; /* Red 100 */
+            color: #ef4444; /* Red 500 */
+        }
+        .btn-income-active {
+            background-color: #10b981; /* Emerald 500 */
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3), 0 2px 4px -2px rgba(16, 185, 129, 0.3);
+        }
+        .btn-income-inactive {
+            background-color: #d1fae5; /* Emerald 100 */
+            color: #10b981; /* Emerald 500 */
+        }
     </style>
+    <!-- Load Inter Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
 <body>
 
 <div id="app" class="budget-card">
-    <div id="notificationMessage" class="hidden px-4 py-3 rounded-lg shadow-lg" role="alert"></div>
+    <!-- Success/Error Notification (Fixed toast) -->
+    <div id="notificationMessage" class="hidden px-4 py-3 rounded-lg shadow-lg font-medium" role="alert"></div>
 
+    <!-- Balance Display -->
     <div class="p-6 bg-emerald-50 rounded-xl mb-6">
         <div class="flex justify-between items-start mb-2">
             <div>
                 <p class="text-lg font-semibold text-gray-600">Remaining Balance</p>
             </div>
+            <!-- Button to change budget -->
             <button id="changeBudgetButton" class="text-xs font-semibold px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full hover:bg-emerald-200 transition">
                 Change Budget
             </button>
@@ -81,8 +101,9 @@
             <span class="text-xl font-semibold text-gray-600 block mt-1">out of <span id="initialBalance">€150.00</span></span>
         </div>
 
+        <!-- Budget Change Form (Initially Hidden) -->
         <div id="budgetChangeForm" class="hidden mt-4 pt-4 border-t border-emerald-200">
-            <h3 class="text-base font-semibold text-gray-700 mb-2">Set New Starting Budget (Keeps History)</h3>
+            <h3 class="text-base font-semibold text-gray-700 mb-2">Set New Starting Budget</h3>
             <div id="budgetError" class="hidden bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded text-sm mb-2" role="alert"></div>
             <div class="flex gap-2">
                 <input type="number" id="newBudgetInput" step="0.01" placeholder="e.g. 200.00"
@@ -98,40 +119,44 @@
         </div>
     </div>
 
+    <!-- Transaction Form (Low-Friction Logging) -->
     <div class="mb-8 p-6 border border-gray-200 rounded-xl">
-        <h2 class="text-xl font-semibold text-gray-800 mb-4">Log New Transaction</h2>
-        <div id="expenseErrorMessage" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" role="alert"></div>
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Quick Log</h2>
+        <div id="expenseErrorMessage" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 text-sm" role="alert"></div>
 
-        <div class="flex flex-col sm:flex-row gap-4 mb-4">
+        <!-- The form handles the "Enter" key submission -->
+        <form id="transactionForm" class="space-y-4">
+            <!-- Amount Input (Only input field) -->
             <div class="flex-1">
-                <label for="amountInput" class="block text-sm font-medium text-gray-700">Amount (€)</label>
-                <input type="number" id="amountInput" step="0.01" placeholder="e.g. 15.50"
-                        class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3 border"
+                <label for="amountInput" id="currentModeLabel" class="block text-sm font-semibold text-gray-700 transition duration-300">
+                    Amount (€) - Current Mode: <span class="text-red-600">Expense</span>
+                </label>
+                <input type="number" id="amountInput" step="0.01" placeholder="Enter amount and press Enter..."
+                        class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3 border text-2xl font-bold"
                         required>
             </div>
-            <div class="flex-1">
-                <label for="descriptionInput" class="block text-sm font-medium text-gray-700">Description (Optional)</label>
-                <input type="text" id="descriptionInput" placeholder="e.g. Coffee or Bonus Payment"
-                        class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3 border">
+            
+            <div class="flex gap-4">
+                <!-- Expense Button (Sets active mode to expense) -->
+                <button type="button" id="logExpenseButton"
+                        class="spent-button flex-1 flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50">
+                    <span id="expenseButtonText">Log Expense (-)</span>
+                </button>
+                <!-- Income Button (Sets active mode to income) -->
+                <button type="button" id="logIncomeButton"
+                        class="spent-button flex-1 flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50">
+                    <span id="incomeButtonText">Log Income (+)</span>
+                </button>
             </div>
-        </div>
-        
-        <div class="flex gap-4">
-            <button id="logExpenseButton"
-                    class="spent-button flex-1 flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50">
-                <span id="expenseButtonText">Log Expense (-)</span>
-            </button>
-            <button id="logIncomeButton"
-                    class="spent-button flex-1 flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50">
-                <span id="incomeButtonText">Log Income (+)</span>
-            </button>
-        </div>
+        </form>
     </div>
 
+    <!-- Transaction History -->
     <div class="border-t pt-4 border-gray-200">
         <h2 class="text-xl font-semibold text-gray-800 mb-4">Transaction History</h2>
         <ul id="transactionHistory" class="space-y-2">
-            <li id="noHistory" class="text-gray-500 text-sm italic">No expenses logged yet.</li>
+            <!-- History items will be inserted here -->
+            <li id="noHistory" class="text-gray-500 text-sm italic">No transactions logged yet.</li>
         </ul>
     </div>
 </div>
@@ -140,17 +165,21 @@
     // --- Local Storage Configuration ---
     const STORAGE_KEY = 'localBudgetTrackerData';
     const INITIAL_BUDGET = 150.00; // Starting budget in Euros
+    
+    // Global state to track which transaction type should be logged on Enter press
+    let activeTransactionType = 'expense'; 
 
     // --- DOM Elements ---
+    const transactionForm = document.getElementById('transactionForm');
     const balanceDisplay = document.getElementById('currentBalance');
     const initialBalanceDisplay = document.getElementById('initialBalance');
     const amountInput = document.getElementById('amountInput');
-    const descriptionInput = document.getElementById('descriptionInput');
     const logExpenseButton = document.getElementById('logExpenseButton');
     const logIncomeButton = document.getElementById('logIncomeButton');
     const historyList = document.getElementById('transactionHistory');
     const loadingMessage = document.getElementById('loadingMessage');
     const balanceContainer = document.getElementById('balanceContainer');
+    const currentModeLabel = document.getElementById('currentModeLabel');
     
     // Budget Change Elements
     const changeBudgetButton = document.getElementById('changeBudgetButton');
@@ -175,7 +204,6 @@
             const storedData = localStorage.getItem(STORAGE_KEY);
             if (storedData) {
                 const data = JSON.parse(storedData);
-                // Ensure required fields exist in case of partial saves
                 return {
                     initialBudget: data.initialBudget || INITIAL_BUDGET,
                     currentBalance: data.currentBalance || INITIAL_BUDGET,
@@ -186,7 +214,6 @@
             console.error("Error loading data from localStorage:", e);
         }
         
-        // Return initial state if no data is found or an error occurred
         return {
             initialBudget: INITIAL_BUDGET,
             currentBalance: INITIAL_BUDGET,
@@ -213,11 +240,11 @@
     /**
      * Shows a temporary toast notification.
      * @param {string} message - The message to display.
-     * @param {string} classes - Tailwind classes for styling (e.g., 'bg-blue-100 text-blue-700').
+     * @param {string} classes - Tailwind classes for styling.
      */
     function showNotification(message, classes = 'bg-green-100 text-green-700') {
         notificationMessageDiv.textContent = message;
-        notificationMessageDiv.className = `px-4 py-3 rounded-lg shadow-lg ${classes}`;
+        notificationMessageDiv.className = `px-4 py-3 rounded-lg shadow-lg font-medium ${classes}`;
         notificationMessageDiv.classList.remove('hidden');
         setTimeout(() => {
             notificationMessageDiv.classList.add('hidden');
@@ -231,11 +258,10 @@
     function renderHistory(transactions) {
         historyList.innerHTML = ''; // Clear existing list
         if (!transactions || transactions.length === 0) {
-            historyList.innerHTML = '<li id="noHistory" class="text-gray-500 text-sm italic">No expenses logged yet.</li>';
+            historyList.innerHTML = '<li id="noHistory" class="text-gray-500 text-sm italic">No transactions logged yet.</li>';
             return;
         }
 
-        // Reverse to show newest transactions first
         const sortedTransactions = [...transactions].sort((a, b) => b.timestamp - a.timestamp);
 
         sortedTransactions.forEach((t) => {
@@ -250,14 +276,13 @@
             const date = new Date(t.timestamp);
             const dateString = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-            const description = t.description || (t.amount < 0 ? 'Expense' : 'Income');
+            // Since description is removed, default to the type
+            const description = t.type === 'expense' ? 'Expense' : 'Income'; 
             
-            // Determine color and sign based on transaction value
             const isExpense = t.amount < 0;
             const amountClass = isExpense ? 'text-red-600' : 'text-emerald-600';
             const sign = isExpense ? '-' : '+';
 
-            // Added a Remove button with a data-timestamp attribute for easy identification
             listItem.innerHTML = `
                 <div class="flex flex-col flex-1 min-w-0">
                     <span class="text-gray-900 font-medium truncate">${description}</span>
@@ -265,7 +290,7 @@
                 </div>
                 <div class="flex items-center space-x-3">
                     <span class="${amountClass} font-semibold text-lg">${sign}${amountString}</span>
-                    <button class="remove-btn text-red-400 hover:text-red-600 p-1 rounded-full transition" data-timestamp="${t.timestamp}" title="Remove Transaction">
+                    <button type="button" class="remove-btn text-red-400 hover:text-red-600 p-1 rounded-full transition" data-timestamp="${t.timestamp}" title="Remove Transaction">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
                         </svg>
@@ -275,9 +300,8 @@
             historyList.appendChild(listItem);
         });
 
-        // After rendering, attach listeners to the newly created remove buttons
+        // Attach listeners to the newly created remove buttons
         historyList.querySelectorAll('.remove-btn').forEach(button => {
-            // Use e.currentTarget.dataset.timestamp to get the transaction ID (which is the timestamp)
             button.onclick = (e) => removeTransaction(parseInt(e.currentTarget.dataset.timestamp));
         });
     }
@@ -290,7 +314,6 @@
         const balance = data.currentBalance;
         const initial = data.initialBudget;
 
-        // Format the balance display
         balanceDisplay.textContent = new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency: 'EUR'
@@ -301,19 +324,16 @@
             currency: 'EUR'
         }).format(initial);
 
-        // Change color based on balance
+        // Update color based on balance
+        let balanceColorClass = 'text-emerald-500';
         if (balance < initial * 0.25) {
-            balanceDisplay.classList.remove('text-emerald-500', 'text-amber-500');
-            balanceDisplay.classList.add('text-red-500');
+            balanceColorClass = 'text-red-500';
         } else if (balance < initial * 0.5) {
-            balanceDisplay.classList.remove('text-emerald-500', 'text-red-500');
-            balanceDisplay.classList.add('text-amber-500');
-        } else {
-            balanceDisplay.classList.remove('text-red-500', 'text-amber-500');
-            balanceDisplay.classList.add('text-emerald-500');
-        }
+            balanceColorClass = 'text-amber-500';
+        } 
+        
+        balanceDisplay.className = `balance-display ${balanceColorClass}`;
 
-        // Render history
         renderHistory(data.transactions);
 
         // Hide loading, show content
@@ -322,32 +342,47 @@
         logExpenseButton.disabled = false;
         logIncomeButton.disabled = false;
         changeBudgetButton.disabled = false;
+
+        // Ensure button styles are set on load
+        updateButtonStyles();
     }
 
-    // --- Budget Change Logic ---
-
     /**
-     * Toggles the visibility of the budget change form.
+     * Updates the button styles and label text to reflect the current active transaction type.
      */
+    function updateButtonStyles() {
+        const span = currentModeLabel.querySelector('span');
+
+        if (activeTransactionType === 'expense') {
+            logExpenseButton.className = 'spent-button flex-1 flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 btn-expense-active';
+            logIncomeButton.className = 'spent-button flex-1 flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 btn-income-inactive';
+            span.textContent = 'Expense';
+            span.className = 'text-red-600';
+        } else {
+            logExpenseButton.className = 'spent-button flex-1 flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 btn-expense-inactive';
+            logIncomeButton.className = 'spent-button flex-1 flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 btn-income-active';
+            span.textContent = 'Income';
+            span.className = 'text-emerald-600';
+        }
+    }
+
+    // --- Budget Change Logic (Unchanged) ---
     function toggleBudgetForm(show) {
+        // ... (Budget change logic remains the same)
         if (show) {
             budgetChangeForm.classList.remove('hidden');
             changeBudgetButton.classList.add('hidden');
-            // Pre-fill input with current initial budget
             const currentBudget = initialBalanceDisplay.textContent.replace('€', '').replace(/,/g, '');
             newBudgetInput.value = parseFloat(currentBudget).toFixed(2);
         } else {
             budgetChangeForm.classList.add('hidden');
             changeBudgetButton.classList.remove('hidden');
-            budgetError.classList.add('hidden'); // Hide any previous error
-            setBudgetButton.disabled = false; // Ensure button is re-enabled
+            budgetError.classList.add('hidden'); 
+            setBudgetButton.disabled = false; 
             setBudgetButton.textContent = 'Set';
         }
     }
     
-    /**
-     * Updates the initial budget, recalculating the balance against existing history.
-     */
     function updateBudget() {
         const newBudgetStr = newBudgetInput.value.trim();
         budgetError.classList.add('hidden');
@@ -363,26 +398,17 @@
         setBudgetButton.textContent = 'Saving...';
 
         try {
-            // Load existing data
             let data = loadData();
-            
-            // Calculate the total net flow (sum of all transactions)
             const totalNetFlow = data.transactions.reduce((sum, t) => sum + t.amount, 0);
             
-            // 1. Set new initial budget
             data.initialBudget = newBudgetAmount;
-            
-            // 2. Recalculate current balance: New Initial Budget + Net Flow
             data.currentBalance = newBudgetAmount + totalNetFlow;
-
-            // IMPORTANT: History (data.transactions) is now preserved!
             
             saveData(data);
             updateUI(data);
 
-            // Show success message and hide form
             toggleBudgetForm(false);
-            showNotification('Starting Budget successfully updated to €' + newBudgetAmount.toFixed(2), 'bg-blue-100 text-blue-700');
+            showNotification('Starting Budget updated to €' + newBudgetAmount.toFixed(2), 'bg-blue-100 text-blue-700');
 
         } catch (e) {
             console.error("Error updating budget: ", e);
@@ -394,15 +420,13 @@
         }
     }
     
-    // --- Transaction Logging Logic (Handles both Expense and Income) ---
+    // --- Transaction Logging Logic (Uses activeTransactionType state) ---
 
     /**
-     * Logs a new transaction (expense or income).
-     * @param {string} type - 'expense' or 'income'.
+     * Logs a new transaction based on the active mode (expense or income).
      */
     function logTransaction(type) {
         const amountStr = amountInput.value.trim();
-        const description = descriptionInput.value.trim();
 
         expenseErrorMessageDiv.classList.add('hidden');
 
@@ -415,45 +439,41 @@
         const rawAmount = parseFloat(amountStr);
         
         let transactionValue;
-        let buttonTextElement;
         let logButton;
 
         if (type === 'expense') {
-            transactionValue = -Math.abs(rawAmount); // Negative for expense
-            buttonTextElement = document.getElementById('expenseButtonText');
+            transactionValue = -Math.abs(rawAmount);
             logButton = logExpenseButton;
-        } else { // type === 'income'
-            transactionValue = Math.abs(rawAmount); // Positive for income
-            buttonTextElement = document.getElementById('incomeButtonText');
+        } else { 
+            transactionValue = Math.abs(rawAmount);
             logButton = logIncomeButton;
         }
 
-        logButton.disabled = true;
-        buttonTextElement.textContent = 'Processing...';
+        // Temporarily disable the input to prevent double submission
+        amountInput.disabled = true;
 
         try {
-            // Load existing data
             let data = loadData();
-
             const newBalance = data.currentBalance + transactionValue;
 
             const newTransaction = {
                 timestamp: Date.now(), 
                 amount: transactionValue,
-                description: description,
-                type: type // Store type for clarity
+                type: type // Store type for history display
             };
 
-            // Update balance and transactions array
             data.currentBalance = newBalance;
             data.transactions.push(newTransaction);
             
             saveData(data);
             updateUI(data);
 
-            // Clear inputs on success
+            // Clear inputs and set mode back to expense (for quick next log)
             amountInput.value = '';
-            descriptionInput.value = '';
+            activeTransactionType = 'expense';
+            updateButtonStyles(); 
+            amountInput.focus(); // Keep focus for next entry
+
             showNotification(`${type === 'income' ? 'Income' : 'Expense'} logged successfully!`, type === 'income' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700');
 
 
@@ -462,20 +482,17 @@
             expenseErrorMessageDiv.textContent = 'An error occurred while saving the transaction.';
             expenseErrorMessageDiv.classList.remove('hidden');
         } finally {
-            logButton.disabled = false;
-            buttonTextElement.textContent = type === 'expense' ? 'Log Expense (-)' : 'Log Income (+)';
+            amountInput.disabled = false;
         }
     }
 
     /**
-     * Removes a transaction by its timestamp and reverses the budget change.
-     * @param {number} timestamp - The unique timestamp of the transaction to remove.
+     * Removes a transaction by its timestamp.
      */
     function removeTransaction(timestamp) {
         try {
             let data = loadData();
             
-            // Find the transaction being removed
             const transactionToRemove = data.transactions.find(t => t.timestamp === timestamp);
 
             if (!transactionToRemove) {
@@ -483,18 +500,11 @@
                 return;
             }
 
-            // 1. Calculate the reverse impact:
-            // If amount was -10 (expense), reverse is +10.
-            // If amount was +50 (income), reverse is -50.
             const reverseAmount = -transactionToRemove.amount;
 
-            // 2. Filter out the removed transaction
             data.transactions = data.transactions.filter(t => t.timestamp !== timestamp);
-
-            // 3. Update the balance
             data.currentBalance = data.currentBalance + reverseAmount;
 
-            // 4. Save and Update UI
             saveData(data);
             updateUI(data);
 
@@ -517,17 +527,40 @@
         const initialData = loadData();
         updateUI(initialData);
 
-        // Hide the loading message once data is loaded
         loadingMessage.textContent = "Data loaded from browser storage.";
         loadingMessage.classList.remove('text-xl', 'text-gray-500');
         loadingMessage.classList.add('text-xs', 'text-gray-400');
+        
+        // Default to expense mode and set initial button styles
+        activeTransactionType = 'expense';
+        updateButtonStyles();
+        amountInput.focus();
     }
 
-    // --- Core Application Start Logic ---
+    // --- Event Listeners ---
     
-    // Attach Event Listeners
-    logExpenseButton.addEventListener('click', () => logTransaction('expense'));
-    logIncomeButton.addEventListener('click', () => logTransaction('income'));
+    // 1. Enter Key Submission Handler
+    transactionForm.addEventListener('submit', (e) => {
+        e.preventDefault(); // Prevents the default form submission (page reload)
+        logTransaction(activeTransactionType);
+    });
+
+    // 2. Mode Toggle Handlers
+    logExpenseButton.addEventListener('click', () => {
+        activeTransactionType = 'expense';
+        updateButtonStyles();
+        amountInput.focus();
+        expenseErrorMessageDiv.classList.add('hidden');
+    });
+
+    logIncomeButton.addEventListener('click', () => {
+        activeTransactionType = 'income';
+        updateButtonStyles();
+        amountInput.focus();
+        expenseErrorMessageDiv.classList.add('hidden');
+    });
+
+    // 3. Budget Change Handlers
     changeBudgetButton.addEventListener('click', () => toggleBudgetForm(true));
     cancelBudgetButton.addEventListener('click', () => toggleBudgetForm(false));
     setBudgetButton.addEventListener('click', updateBudget);
