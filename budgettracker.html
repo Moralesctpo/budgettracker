@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>€150 Budget Tracker</title>
+    <!-- Load Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for Inter font and overall look */
+        :root {
+            --primary-color: #10b981; /* Emerald 500 */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .budget-card {
+            max-width: 500px;
+            width: 100%;
+            background-color: white;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            animation: fadeIn 0.5s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .balance-display {
+            font-size: 3.5rem;
+            font-weight: 800;
+            color: var(--primary-color);
+            line-height: 1;
+        }
+        .spent-button {
+            transition: all 0.2s ease-in-out;
+        }
+        .spent-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
+        }
+        .history-item:nth-child(even) {
+            background-color: #f3f4f6;
+        }
+        /* Custom style for the success message (using the error div as a temporary toast) */
+        #notificationMessage {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 50;
+            transition: opacity 0.3s ease-in-out;
+            max-width: 300px;
+        }
+    </style>
+    <!-- Load Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div id="app" class="budget-card">
+    <h1 class="text-3xl font-bold text-gray-800 mb-2">€150 Budget Tracker</h1>
+    <p class="text-sm text-gray-500 mb-6">Track your spending and manage your starting fund.</p>
+
+    <!-- Success/Error Notification (Temporarily used as a fixed toast) -->
+    <div id="notificationMessage" class="hidden px-4 py-3 rounded-lg shadow-lg" role="alert"></div>
+
+    <!-- Balance Display -->
+    <div class="p-6 bg-emerald-50 rounded-xl mb-6">
+        <div class="flex justify-between items-start mb-2">
+            <div>
+                <p class="text-lg font-semibold text-gray-600">Remaining Balance</p>
+            </div>
+            <!-- Button to change budget -->
+            <button id="changeBudgetButton" class="text-xs font-semibold px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full hover:bg-emerald-200 transition">
+                Change Budget
+            </button>
+        </div>
+
+        <!-- The loading message will now show the Local Storage status -->
+        <div id="loadingMessage" class="text-xs text-gray-400">Loading local data...</div>
+        <div id="balanceContainer" class="hidden">
+            <span id="currentBalance" class="balance-display">€150.00</span>
+            <span class="text-xl font-semibold text-gray-600 block mt-1">out of <span id="initialBalance">€150.00</span></span>
+        </div>
+
+        <!-- Budget Change Form (Initially Hidden) -->
+        <div id="budgetChangeForm" class="hidden mt-4 pt-4 border-t border-emerald-200">
+            <h3 class="text-base font-semibold text-gray-700 mb-2">Set New Starting Budget (Keeps History)</h3>
+            <div id="budgetError" class="hidden bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded text-sm mb-2" role="alert"></div>
+            <div class="flex gap-2">
+                <input type="number" id="newBudgetInput" step="0.01" placeholder="e.g. 200.00"
+                       class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-2 border text-sm"
+                       required>
+                <button id="setBudgetButton" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow transition">
+                    Set
+                </button>
+                <button id="cancelBudgetButton" class="px-3 py-2 text-sm font-medium text-gray-600 bg-gray-200 hover:bg-gray-300 rounded-lg transition">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transaction Form (Updated for both Expense and Income) -->
+    <div class="mb-8 p-6 border border-gray-200 rounded-xl">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Log New Transaction</h2>
+        <div id="expenseErrorMessage" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" role="alert"></div>
+
+        <div class="flex flex-col sm:flex-row gap-4 mb-4">
+            <!-- Amount Input -->
+            <div class="flex-1">
+                <label for="amountInput" class="block text-sm font-medium text-gray-700">Amount (€)</label>
+                <input type="number" id="amountInput" step="0.01" placeholder="e.g. 15.50"
+                       class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3 border"
+                       required>
+            </div>
+            <!-- Description Input -->
+            <div class="flex-1">
+                <label for="descriptionInput" class="block text-sm font-medium text-gray-700">Description (Optional)</label>
+                <input type="text" id="descriptionInput" placeholder="e.g. Coffee or Bonus Payment"
+                       class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3 border">
+            </div>
+        </div>
+        
+        <div class="flex gap-4">
+            <!-- Expense Button (Red) -->
+            <button id="logExpenseButton"
+                    class="spent-button flex-1 flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50">
+                <span id="expenseButtonText">Log Expense (-)</span>
+            </button>
+            <!-- Income Button (Green) -->
+            <button id="logIncomeButton"
+                    class="spent-button flex-1 flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50">
+                <span id="incomeButtonText">Log Income (+)</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Transaction History -->
+    <div class="border-t pt-4 border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Transaction History</h2>
+        <ul id="transactionHistory" class="space-y-2">
+            <!-- History items will be inserted here -->
+            <li id="noHistory" class="text-gray-500 text-sm italic">No expenses logged yet.</li>
+        </ul>
+    </div>
+</div>
+
+<script type="module">
+    // --- Local Storage Configuration ---
+    const STORAGE_KEY = 'localBudgetTrackerData';
+    const INITIAL_BUDGET = 150.00; // Starting budget in Euros
+
+    // --- DOM Elements ---
+    const balanceDisplay = document.getElementById('currentBalance');
+    const initialBalanceDisplay = document.getElementById('initialBalance');
+    const amountInput = document.getElementById('amountInput');
+    const descriptionInput = document.getElementById('descriptionInput');
+    const logExpenseButton = document.getElementById('logExpenseButton');
+    const logIncomeButton = document.getElementById('logIncomeButton');
+    const historyList = document.getElementById('transactionHistory');
+    const loadingMessage = document.getElementById('loadingMessage');
+    const balanceContainer = document.getElementById('balanceContainer');
+    
+    // Budget Change Elements
+    const changeBudgetButton = document.getElementById('changeBudgetButton');
+    const budgetChangeForm = document.getElementById('budgetChangeForm');
+    const newBudgetInput = document.getElementById('newBudgetInput');
+    const setBudgetButton = document.getElementById('setBudgetButton');
+    const cancelBudgetButton = document.getElementById('cancelBudgetButton');
+    const budgetError = document.getElementById('budgetError');
+
+    // Error and Notification Messages
+    const expenseErrorMessageDiv = document.getElementById('expenseErrorMessage');
+    const notificationMessageDiv = document.getElementById('notificationMessage');
+
+    // --- Utility Functions for Local Storage ---
+
+    /**
+     * Loads the budget data from localStorage.
+     * @returns {Object} The budget data or a default initial state.
+     */
+    function loadData() {
+        try {
+            const storedData = localStorage.getItem(STORAGE_KEY);
+            if (storedData) {
+                const data = JSON.parse(storedData);
+                // Ensure required fields exist in case of partial saves
+                return {
+                    initialBudget: data.initialBudget || INITIAL_BUDGET,
+                    currentBalance: data.currentBalance || INITIAL_BUDGET,
+                    transactions: data.transactions || []
+                };
+            }
+        } catch (e) {
+            console.error("Error loading data from localStorage:", e);
+        }
+        
+        // Return initial state if no data is found or an error occurred
+        return {
+            initialBudget: INITIAL_BUDGET,
+            currentBalance: INITIAL_BUDGET,
+            transactions: []
+        };
+    }
+
+    /**
+     * Saves the budget data to localStorage.
+     * @param {Object} data - The complete budget data object.
+     */
+    function saveData(data) {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        } catch (e) {
+            console.error("Error saving data to localStorage:", e);
+            showNotification('Error: Could not save data locally!', 'bg-red-100 text-red-700');
+        }
+    }
+
+
+    // --- UI and Core Logic Functions ---
+
+    /**
+     * Shows a temporary toast notification.
+     * @param {string} message - The message to display.
+     * @param {string} classes - Tailwind classes for styling (e.g., 'bg-blue-100 text-blue-700').
+     */
+    function showNotification(message, classes = 'bg-green-100 text-green-700') {
+        notificationMessageDiv.textContent = message;
+        notificationMessageDiv.className = `px-4 py-3 rounded-lg shadow-lg ${classes}`;
+        notificationMessageDiv.classList.remove('hidden');
+        setTimeout(() => {
+            notificationMessageDiv.classList.add('hidden');
+        }, 3000);
+    }
+
+    /**
+     * Renders the transaction history list.
+     * @param {Array<Object>} transactions - The list of transactions.
+     */
+    function renderHistory(transactions) {
+        historyList.innerHTML = ''; // Clear existing list
+        if (!transactions || transactions.length === 0) {
+            historyList.innerHTML = '<li id="noHistory" class="text-gray-500 text-sm italic">No expenses logged yet.</li>';
+            return;
+        }
+
+        // Reverse to show newest transactions first
+        const sortedTransactions = [...transactions].sort((a, b) => b.timestamp - a.timestamp);
+
+        sortedTransactions.forEach((t) => {
+            const listItem = document.createElement('li');
+            listItem.className = 'history-item flex justify-between items-center p-3 rounded-lg border-b border-gray-100';
+
+            const amountString = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'EUR'
+            }).format(Math.abs(t.amount));
+
+            const date = new Date(t.timestamp);
+            const dateString = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            const description = t.description || (t.amount < 0 ? 'Expense' : 'Income');
+            
+            // Determine color and sign based on transaction value
+            const isExpense = t.amount < 0;
+            const amountClass = isExpense ? 'text-red-600' : 'text-emerald-600';
+            const sign = isExpense ? '-' : '+';
+
+            // Added a Remove button with a data-timestamp attribute for easy identification
+            listItem.innerHTML = `
+                <div class="flex flex-col flex-1 min-w-0">
+                    <span class="text-gray-900 font-medium truncate">${description}</span>
+                    <span class="text-xs text-gray-500">${dateString}</span>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <span class="${amountClass} font-semibold text-lg">${sign}${amountString}</span>
+                    <button class="remove-btn text-red-400 hover:text-red-600 p-1 rounded-full transition" data-timestamp="${t.timestamp}" title="Remove Transaction">
+                        <!-- Trash Can Icon (Inline SVG) -->
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+            `;
+            historyList.appendChild(listItem);
+        });
+
+        // After rendering, attach listeners to the newly created remove buttons
+        historyList.querySelectorAll('.remove-btn').forEach(button => {
+            // Use e.currentTarget.dataset.timestamp to get the transaction ID (which is the timestamp)
+            button.onclick = (e) => removeTransaction(parseInt(e.currentTarget.dataset.timestamp));
+        });
+    }
+
+    /**
+     * Updates the UI with the latest budget data.
+     * @param {Object} data - The budget data.
+     */
+    function updateUI(data) {
+        const balance = data.currentBalance;
+        const initial = data.initialBudget;
+
+        // Format the balance display
+        balanceDisplay.textContent = new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'EUR'
+        }).format(balance);
+
+        initialBalanceDisplay.textContent = new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'EUR'
+        }).format(initial);
+
+        // Change color based on balance
+        if (balance < initial * 0.25) {
+            balanceDisplay.classList.remove('text-emerald-500', 'text-amber-500');
+            balanceDisplay.classList.add('text-red-500');
+        } else if (balance < initial * 0.5) {
+            balanceDisplay.classList.remove('text-emerald-500', 'text-red-500');
+            balanceDisplay.classList.add('text-amber-500');
+        } else {
+            balanceDisplay.classList.remove('text-red-500', 'text-amber-500');
+            balanceDisplay.classList.add('text-emerald-500');
+        }
+
+        // Render history
+        renderHistory(data.transactions);
+
+        // Hide loading, show content
+        loadingMessage.classList.add('hidden');
+        balanceContainer.classList.remove('hidden');
+        logExpenseButton.disabled = false;
+        logIncomeButton.disabled = false;
+        changeBudgetButton.disabled = false;
+    }
+
+    // --- Budget Change Logic ---
+
+    /**
+     * Toggles the visibility of the budget change form.
+     */
+    function toggleBudgetForm(show) {
+        if (show) {
+            budgetChangeForm.classList.remove('hidden');
+            changeBudgetButton.classList.add('hidden');
+            // Pre-fill input with current initial budget
+            const currentBudget = initialBalanceDisplay.textContent.replace('€', '').replace(/,/g, '');
+            newBudgetInput.value = parseFloat(currentBudget).toFixed(2);
+        } else {
+            budgetChangeForm.classList.add('hidden');
+            changeBudgetButton.classList.remove('hidden');
+            budgetError.classList.add('hidden'); // Hide any previous error
+            setBudgetButton.disabled = false; // Ensure button is re-enabled
+            setBudgetButton.textContent = 'Set';
+        }
+    }
+    
+    /**
+     * Updates the initial budget, recalculating the balance against existing history.
+     */
+    function updateBudget() {
+        const newBudgetStr = newBudgetInput.value.trim();
+        budgetError.classList.add('hidden');
+
+        if (!newBudgetStr || isNaN(parseFloat(newBudgetStr)) || parseFloat(newBudgetStr) <= 0) {
+            budgetError.textContent = 'Please enter a valid budget amount greater than zero.';
+            budgetError.classList.remove('hidden');
+            return;
+        }
+
+        const newBudgetAmount = parseFloat(newBudgetStr);
+        setBudgetButton.disabled = true;
+        setBudgetButton.textContent = 'Saving...';
+
+        try {
+            // Load existing data
+            let data = loadData();
+            
+            // Calculate the total net flow (sum of all transactions)
+            const totalNetFlow = data.transactions.reduce((sum, t) => sum + t.amount, 0);
+            
+            // 1. Set new initial budget
+            data.initialBudget = newBudgetAmount;
+            
+            // 2. Recalculate current balance: New Initial Budget + Net Flow
+            data.currentBalance = newBudgetAmount + totalNetFlow;
+
+            // IMPORTANT: History (data.transactions) is now preserved!
+            
+            saveData(data);
+            updateUI(data);
+
+            // Show success message and hide form
+            toggleBudgetForm(false);
+            showNotification('Starting Budget successfully updated to €' + newBudgetAmount.toFixed(2), 'bg-blue-100 text-blue-700');
+
+        } catch (e) {
+            console.error("Error updating budget: ", e);
+            budgetError.textContent = 'An error occurred while saving the new budget.';
+            budgetError.classList.remove('hidden');
+        } finally {
+            setBudgetButton.disabled = false;
+            setBudgetButton.textContent = 'Set';
+        }
+    }
+    
+    // --- Transaction Logging Logic (Handles both Expense and Income) ---
+
+    /**
+     * Logs a new transaction (expense or income).
+     * @param {string} type - 'expense' or 'income'.
+     */
+    function logTransaction(type) {
+        const amountStr = amountInput.value.trim();
+        const description = descriptionInput.value.trim();
+
+        expenseErrorMessageDiv.classList.add('hidden');
+
+        if (!amountStr || isNaN(parseFloat(amountStr)) || parseFloat(amountStr) <= 0) {
+            expenseErrorMessageDiv.textContent = 'Please enter a valid amount greater than zero.';
+            expenseErrorMessageDiv.classList.remove('hidden');
+            return;
+        }
+
+        const rawAmount = parseFloat(amountStr);
+        
+        let transactionValue;
+        let buttonTextElement;
+        let logButton;
+
+        if (type === 'expense') {
+            transactionValue = -Math.abs(rawAmount); // Negative for expense
+            buttonTextElement = document.getElementById('expenseButtonText');
+            logButton = logExpenseButton;
+        } else { // type === 'income'
+            transactionValue = Math.abs(rawAmount); // Positive for income
+            buttonTextElement = document.getElementById('incomeButtonText');
+            logButton = logIncomeButton;
+        }
+
+        logButton.disabled = true;
+        buttonTextElement.textContent = 'Processing...';
+
+        try {
+            // Load existing data
+            let data = loadData();
+
+            const newBalance = data.currentBalance + transactionValue;
+
+            const newTransaction = {
+                timestamp: Date.now(), 
+                amount: transactionValue,
+                description: description,
+                type: type // Store type for clarity
+            };
+
+            // Update balance and transactions array
+            data.currentBalance = newBalance;
+            data.transactions.push(newTransaction);
+            
+            saveData(data);
+            updateUI(data);
+
+            // Clear inputs on success
+            amountInput.value = '';
+            descriptionInput.value = '';
+            showNotification(`${type === 'income' ? 'Income' : 'Expense'} logged successfully!`, type === 'income' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700');
+
+
+        } catch (e) {
+            console.error("Error logging transaction: ", e);
+            expenseErrorMessageDiv.textContent = 'An error occurred while saving the transaction.';
+            expenseErrorMessageDiv.classList.remove('hidden');
+        } finally {
+            logButton.disabled = false;
+            buttonTextElement.textContent = type === 'expense' ? 'Log Expense (-)' : 'Log Income (+)';
+        }
+    }
+
+    /**
+     * Removes a transaction by its timestamp and reverses the budget change.
+     * @param {number} timestamp - The unique timestamp of the transaction to remove.
+     */
+    function removeTransaction(timestamp) {
+        try {
+            let data = loadData();
+            
+            // Find the transaction being removed
+            const transactionToRemove = data.transactions.find(t => t.timestamp === timestamp);
+
+            if (!transactionToRemove) {
+                showNotification('Error: Transaction not found!', 'bg-red-100 text-red-700');
+                return;
+            }
+
+            // 1. Calculate the reverse impact:
+            // If amount was -10 (expense), reverse is +10.
+            // If amount was +50 (income), reverse is -50.
+            const reverseAmount = -transactionToRemove.amount;
+
+            // 2. Filter out the removed transaction
+            data.transactions = data.transactions.filter(t => t.timestamp !== timestamp);
+
+            // 3. Update the balance
+            data.currentBalance = data.currentBalance + reverseAmount;
+
+            // 4. Save and Update UI
+            saveData(data);
+            updateUI(data);
+
+            showNotification('Transaction removed and budget reversed successfully!', 'bg-orange-100 text-orange-700');
+
+        } catch (e) {
+            console.error("Error removing transaction: ", e);
+            showNotification('An error occurred during transaction removal.', 'bg-red-100 text-red-700');
+        }
+    }
+
+    /**
+     * Loads the initial state and starts the application.
+     */
+    function loadInitialState() {
+        logExpenseButton.disabled = true;
+        logIncomeButton.disabled = true;
+        changeBudgetButton.disabled = true;
+
+        const initialData = loadData();
+        updateUI(initialData);
+
+        // Hide the loading message once data is loaded
+        loadingMessage.textContent = "Data loaded from browser storage.";
+        loadingMessage.classList.remove('text-xl', 'text-gray-500');
+        loadingMessage.classList.add('text-xs', 'text-gray-400');
+    }
+
+    // --- Core Application Start Logic ---
+    
+    // Attach Event Listeners
+    logExpenseButton.addEventListener('click', () => logTransaction('expense'));
+    logIncomeButton.addEventListener('click', () => logTransaction('income'));
+    changeBudgetButton.addEventListener('click', () => toggleBudgetForm(true));
+    cancelBudgetButton.addEventListener('click', () => toggleBudgetForm(false));
+    setBudgetButton.addEventListener('click', updateBudget);
+
+    // Start the application
+    loadInitialState();
+
+</script>
+</body>
+</html>
